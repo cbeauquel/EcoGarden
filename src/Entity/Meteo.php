@@ -2,12 +2,25 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use App\Repository\MeteoRepository;
 use Doctrine\ORM\Mapping as ORM;
+use App\Repository\MeteoRepository;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
+
 
 #[ORM\Entity(repositoryClass: MeteoRepository::class)]
-#[ApiResource]
+// #[ApiResource(
+//     description: 'Les prévisions météos',
+//     operations: [
+//         new Get(),
+//         new GetCollection(),
+//     ],
+//     denormalizationContext: ['groups' => ['meteo:write']],
+// )]
+
 class Meteo
 {
     #[ORM\Id]
@@ -16,9 +29,13 @@ class Meteo
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank]
+    #[Assert\Length(min:3, minMessage:"Le nom de la ville doit faire un minimum 3 caractères")]
     private ?string $city = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank]
+    #[Assert\Length(min:5, max:5, minMessage:"Le code postal doit faire 5 caractères")]
     private ?string $postalCode = null;
 
     #[ORM\Column(length: 255, nullable: true)]

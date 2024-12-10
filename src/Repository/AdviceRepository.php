@@ -16,6 +16,27 @@ class AdviceRepository extends ServiceEntityRepository
         parent::__construct($registry, Advice::class);
     }
 
+    /**
+    * @return Advice[] Returns an array of Advice objects
+    */
+    public function findByCurrentMonth($value): array
+    {
+        if($value){
+        return $this->createQueryBuilder('p')
+            ->innerJoin('p.months', 'e')
+            ->andWhere('e.id = :val')
+            ->setParameter('val', $value)
+            ->orderBy('p.id', 'ASC')
+            ->setMaxResults(10)
+            ->getQuery()
+            ->getResult()
+        ;
+        } else {
+            return $this->findall();
+        }
+    }
+
+
     //    /**
     //     * @return Advice[] Returns an array of Advice objects
     //     */
