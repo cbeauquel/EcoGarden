@@ -12,7 +12,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 
 #[ORM\Entity(repositoryClass: AdviceRepository::class)]
-// #[ApiResource]
+#[ApiResource]
 class Advice
 {
     #[ORM\Id]

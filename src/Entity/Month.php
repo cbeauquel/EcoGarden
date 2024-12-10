@@ -19,7 +19,6 @@ class Month
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(["Month:Read"])]
     private ?int $id = null;
 
     #[ORM\Column]

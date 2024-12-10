@@ -14,30 +14,44 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Contracts\Cache\TagAwareCacheInterface;
+
 
 
 class AdviceController extends AbstractController
 {
-    #[Route('/api/conseils', name: 'advice', methods:['GET'])]
-    public function getAdviceList(MonthRepository $monthRepository, SerializerInterface $serializer): JsonResponse
+    #[Route('/api/conseil', name: 'advice', methods:['GET'])]
+    public function getAdviceList(MonthRepository $monthRepository, SerializerInterface $serializer, TagAwareCacheInterface $cachePool): JsonResponse
     {
-        $nbMonth = (new \DateTime())->format('m');
-        $adviceList = $monthRepository->findByMonthNumber($nbMonth);
+        $cacheKey = "getAdviceList";
+
+        $adviceList = $cachePool->get($cacheKey, function ($cacheItem) use ($monthRepository) {
+            $cacheItem->expiresAfter(1800); // Expire après 30 minutes
+            $nbMonth = (new \DateTime())->format('m');
+
+            return $monthRepository->findByMonthNumber($nbMonth);
+        });
+
         $jsonAdviceList = $serializer->serialize($adviceList, 'json', ['groups' => 'Advice:List']);
-        return new JsonResponse(
-            $jsonAdviceList, Response::HTTP_OK, [], true);
+        return new JsonResponse($jsonAdviceList, Response::HTTP_OK, [], true);
     }
 
-    #[Route('/api/conseils/{nbMonth}', name: 'monthAdvice', methods:['GET'], requirements:['id' => '\d+'])]
-    public function getAdviceDetail(MonthRepository $monthRepository, SerializerInterface $serializer, int $nbMonth): JsonResponse
+    #[Route('/api/conseil/{nbMonth}', name: 'monthAdvice', methods:['GET'], requirements:['id' => '\d+'])]
+    public function getAdviceDetail(MonthRepository $monthRepository, SerializerInterface $serializer, int $nbMonth, TagAwareCacheInterface $cachePool): JsonResponse
     {
-        $adviceMonth = $monthRepository->findByMonthNumber($nbMonth);
+        $cacheKey = "getAdviceDetail";
+
+        $adviceMonth = $cachePool->get($cacheKey, function ($cacheItem) use ($monthRepository, $nbMonth) {
+            $cacheItem->expiresAfter(1800); // Expire après 30 minutes
+            return $monthRepository->findByMonthNumber($nbMonth);
+        });
+        
         $jsonAdviceDetail = $serializer->serialize($adviceMonth, 'json', ['groups' => 'Advice:Read']);
-        return new JsonResponse(
-            $jsonAdviceDetail, Response::HTTP_OK, ['accept' => 'json'], true);
+
+        return new JsonResponse($jsonAdviceDetail, Response::HTTP_OK, ['accept' => 'json'], true);
     }
 
-    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour afficher la liste des utilisateurs')]
+    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
     #[Route('/api/conseils/{id}', name: 'deleteAdvice', methods: ['DELETE'])]
     public function deleteAdvice(Advice $advice, EntityManagerInterface $manager): JsonResponse 
     {
@@ -47,7 +61,7 @@ class AdviceController extends AbstractController
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }
 
-    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour afficher la liste des utilisateurs')]
+    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
     #[Route('/api/conseil', name:"createAdvice", methods: ['POST'])]
     public function createAdvice(
         Request $request, 
@@ -80,8 +94,8 @@ class AdviceController extends AbstractController
         return new JsonResponse($jsonAdvice, Response::HTTP_CREATED, ["Location" => $location], true);
    }
 
-   #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour afficher la liste des utilisateurs')]
-   #[Route('/api/conseils/{id}', name:"updateAdvice", methods:['PUT'])]
+   #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
+   #[Route('/api/conseil/{id}', name:"updateAdvice", methods:['PUT'])]
    public function updateAdvice(
         Request $request, 
         SerializerInterface $serializer, 

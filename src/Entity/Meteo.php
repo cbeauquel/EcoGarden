@@ -12,14 +12,13 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 
 #[ORM\Entity(repositoryClass: MeteoRepository::class)]
-// #[ApiResource(
-//     description: 'Les prévisions météos',
-//     operations: [
-//         new Get(),
-//         new GetCollection(),
-//     ],
-//     denormalizationContext: ['groups' => ['meteo:write']],
-// )]
+#[ApiResource(
+    description: 'Les prévisions météos',
+    operations: [
+        new Get(),
+        new GetCollection(),
+    ],
+)]
 
 class Meteo
 {

@@ -19,20 +19,19 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 class UserController extends AbstractController
 {
-    private Security $security;
-
-    public function __construct(Security $security)
-    {
-        $this->security = $security;
-    }
-
-    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour afficher la liste des utilisateurs')]
     #[Route('/api/users', name: 'user', methods:['GET'])]
-    public function getUserList(UserRepository $user, SerializerInterface $serializer): JsonResponse
+    public function getUserList(UserRepository $user, SerializerInterface $serializer, Request $request): JsonResponse
     {
+        $page = $request->get('page', 1);
+        $limit = $request->get('limit', 3);
+        $userList = $user->findAllWithPagination($page, $limit);
+        $canListAll = $this->isGranted('ROLE_ADMIN');
+        if($canListAll){
+            $jsonUserList = $serializer->serialize($userList, 'json', ['groups' => 'User:List']);
+        } else {
+            $jsonUserList = $serializer->serialize($userList, 'json', ['groups' => 'User:Read']);
+        }
 
-        $userList = $user->findAll();
-        $jsonUserList = $serializer->serialize($userList, 'json', ['groups' => 'User:Read', 'User:List']);
         return new JsonResponse(
             $jsonUserList, Response::HTTP_OK, [], true);
     }
@@ -40,16 +39,18 @@ class UserController extends AbstractController
     #[Route('/api/user', name: 'User', methods:['GET'])]
     public function getUserDetail(SerializerInterface $serializer): JsonResponse
     {
-        $currentUser = $this->security->getUser();
+        $currentUser = $this->getUser();
         $jsonUserDetail = $serializer->serialize($currentUser, 'json', ['groups' => 'User:Read']);
         return new JsonResponse(
             $jsonUserDetail, Response::HTTP_OK, ['accept' => 'json'], true);
     }
 
-    #[Route('/api/user/{id}', name: 'deleteUser', methods: ['DELETE'])]
-    public function deleteUser(User $user, EntityManagerInterface $manager): JsonResponse 
+    #[Route('/api/user', name: 'deleteMe', methods: ['DELETE'])]
+    public function deleteMe(EntityManagerInterface $manager): JsonResponse 
     {
-        $manager->remove($user);
+        $currentUser = $this->getUser();
+
+        $manager->remove($currentUser);
         $manager->flush();
 
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
@@ -65,7 +66,7 @@ class UserController extends AbstractController
         ): JsonResponse 
     {
 
-        $user = $serializer->deserialize($request->getContent(), User::class, 'json');
+        $user = $serializer->deserialize($request->getContent(), User::class, 'json', ['groups' => 'User:Write']);
         $content = $request->toArray();
         /** @var string $plainPassword */
         $plainPassword = $content['password'];
@@ -78,11 +79,23 @@ class UserController extends AbstractController
 
         $jsonUser = $serializer->serialize($user, 'json', ['groups' => 'User:Read']);
         
-        $location = $urlGenerator->generate('detailUser', ['id' => $user->getId()], UrlGeneratorInterface::ABSOLUTE_URL);
+        $location = $urlGenerator->generate('user', ['id' => $user->getId()], UrlGeneratorInterface::ABSOLUTE_URL);
 
         return new JsonResponse($jsonUser, Response::HTTP_CREATED, ["Location" => $location], true);
    }
 
+   #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les utilisateurs')]
+   #[Route('/api/user/{id}', name: 'deleteUser', methods: ['DELETE'])]
+   public function deleteUser(User $user, EntityManagerInterface $manager): JsonResponse 
+   {
+
+       $manager->remove($user);
+       $manager->flush();
+
+       return new JsonResponse(null, Response::HTTP_NO_CONTENT);
+   }
+
+   #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les utilisateurs')]
    #[Route('/api/user/{id}', name:"updateUser", methods:['PUT'])]
    public function updateUser(
         Request $request, 

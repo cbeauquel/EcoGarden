@@ -16,19 +16,19 @@ use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
-// #[ApiResource()]
+#[ApiResource()]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(["User:Read"])]
+    #[Groups(["User:Read", "User:List", "User:Write"])]
     private ?int $id = null;
 
     #[Assert\NotBlank]
     #[Assert\Email()]
     #[ORM\Column(length: 180)]
-    #[Groups(["User:Read"])]
+    #[Groups(["User:Read", "User:List", "User:Write"])]
     private ?string $email = null;
 
     /**
@@ -43,7 +43,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     #[ORM\Column]
     #[Assert\NotBlank]
-    #[Groups(["User:List"])]
+    #[Groups(["User:Write"])]
     private ?string $password = null;
     #[SerializedName('password')]
     private ?string $plainPassword = null;
@@ -51,13 +51,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
     #[Assert\Length(min:3, minMessage:"Le nom de la ville doit faire 5 caractères")]
-    #[Groups(["User:Read"])]
+    #[Groups(["User:Read", "User:List", "User:Write"])]
     private ?string $city = null;
 
     #[ORM\Column(length: 5)]
     #[Assert\NotBlank]
     #[Assert\Length(min:5, max:5, minMessage:"Le code postal doit faire 5 caractères")]
-    #[Groups(["User:Read"])]
+    #[Groups(["User:Read", "User:List", "User:Write"])]
     private ?string $postalCode = null;
 
     public function getId(): ?int
