@@ -25,6 +25,11 @@ class Month
     #[ORM\Column]
     #[Groups(["Advice:Read", "Month:Read"])]
     #[Assert\NotBlank]
+    #[Assert\Range(
+        min: 1,
+        max: 12,
+        notInRangeMessage: "Le numéro du mois doit être compris entre {{ min }} et {{ max }}."
+    )]
     private ?int $number = null;
 
     /**

@@ -3,42 +3,115 @@
 namespace App\Controller;
 
 use App\Entity\Advice;
+use OpenApi\Attributes as OA;
 use App\Repository\MonthRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Contracts\Cache\TagAwareCacheInterface;
 use Symfony\Component\Serializer\SerializerInterface;
-use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 
 class AdviceController extends AbstractController
 {
-    #[Route('/api/conseils', name: 'advice', methods:['GET'])]
-    public function getAdviceList(MonthRepository $monthRepository, SerializerInterface $serializer): JsonResponse
+    #[Route('/api/conseil', name: 'advice', methods:['GET'])]    
+    /**
+     * getAdviceList : récupération des conseils (advices) du mois en cours
+     *
+     * @param  mixed $monthRepository
+     * @param  mixed $serializer
+     * @param  mixed $cachePool
+     * @return JsonResponse
+     */
+    #[OA\Response(
+        response:200,
+        description:'Retourne la liste des conseils pour le mois en cours',
+        content: new OA\JsonContent(
+           type:'array',
+           items: new OA\Items(ref: new Model(type:Advice::class, groups: ['Advice:List']))
+        )
+    )]
+    #[OA\Tag(name:'Conseils')]
+    public function getAdviceList(MonthRepository $monthRepository, SerializerInterface $serializer, TagAwareCacheInterface $cachePool): JsonResponse
     {
-        $nbMonth = (new \DateTime())->format('m');
-        $adviceList = $monthRepository->findByMonthNumber($nbMonth);
+        //on initialise le cache
+        $cacheKey = "getAdviceList";
+        
+        //on récupère l'item dans le cache, à l'aide de la clé (cacheKey)
+        $adviceList = $cachePool->get($cacheKey, function ($cacheItem) use ($monthRepository) {
+            $cacheItem->expiresAfter(1800); // Expire après 30 minutes
+            $nbMonth = (new \DateTime())->format('m');
+
+            return $monthRepository->findByMonthNumber($nbMonth);
+        });
+
+        //sérialisation du résultat
         $jsonAdviceList = $serializer->serialize($adviceList, 'json', ['groups' => 'Advice:List']);
-        return new JsonResponse(
-            $jsonAdviceList, Response::HTTP_OK, [], true);
+        return new JsonResponse($jsonAdviceList, Response::HTTP_OK, [], true);
     }
 
-    #[Route('/api/conseils/{nbMonth}', name: 'monthAdvice', methods:['GET'], requirements:['id' => '\d+'])]
-    public function getAdviceDetail(MonthRepository $monthRepository, SerializerInterface $serializer, int $nbMonth): JsonResponse
+    #[Route('/api/conseil/{nbMonth}', name: 'monthAdvice', methods:['GET'], requirements:['nbMonth' => '\d+'])]
+    #[OA\Response(
+        response:200,
+        description:'Retourne la liste des conseils pour le mois voulu',
+        content: new OA\JsonContent(
+           type:'array',
+           items: new OA\Items(ref: new Model(type:Advice::class, groups: ['Advice:Read']))
+        )
+    )]
+    #[OA\Tag(name:'Conseils')]
+
+    /**
+     * getAdviceByMonth : affiche les conseils d'un mois donné dans la requête
+     *
+     * @param  mixed $monthRepository
+     * @param  mixed $serializer
+     * @param  mixed $nbMonth
+     * @param  mixed $cachePool
+     * @param  mixed $request
+     * @return JsonResponse
+     */
+    public function getAdviceByMonth(
+        MonthRepository $monthRepository, 
+        SerializerInterface $serializer, 
+        int $nbMonth,
+        ValidatorInterface $validator,
+        ): JsonResponse
     {
+        //si le numéro de mois saisi n'est pas un mois valide
+        if ($nbMonth < 1 || $nbMonth > 12) {
+            return new JsonResponse([
+                'error' => "Le numéro du mois doit être compris entre 1 et 12."
+            ], JsonResponse::HTTP_BAD_REQUEST);
+        }
+
+        //récupération de la liste des advices en fonction du numéro du mois
+
         $adviceMonth = $monthRepository->findByMonthNumber($nbMonth);
+
         $jsonAdviceDetail = $serializer->serialize($adviceMonth, 'json', ['groups' => 'Advice:Read']);
-        return new JsonResponse(
-            $jsonAdviceDetail, Response::HTTP_OK, ['accept' => 'json'], true);
+
+        return new JsonResponse($jsonAdviceDetail, Response::HTTP_OK, ['accept' => 'json'], true);
     }
 
-    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour afficher la liste des utilisateurs')]
-    #[Route('/api/conseils/{id}', name: 'deleteAdvice', methods: ['DELETE'])]
+    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
+    #[Route('/api/conseil/{id}', name: 'deleteAdvice', methods: ['DELETE'])]    
+    #[OA\Tag(name:'Conseils')]
+
+    /**
+     * deleteAdvice : suppression d'un conseil (admin seuelement)
+     *
+     * @param  mixed $advice
+     * @param  mixed $manager
+     * @return JsonResponse
+     */
     public function deleteAdvice(Advice $advice, EntityManagerInterface $manager): JsonResponse 
     {
         $manager->remove($advice);
@@ -47,47 +120,77 @@ class AdviceController extends AbstractController
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }
 
-    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour afficher la liste des utilisateurs')]
-    #[Route('/api/conseil', name:"createAdvice", methods: ['POST'])]
-    public function createAdvice(
-        Request $request, 
-        SerializerInterface $serializer, 
+    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
+    #[Route('/api/conseil', name:"createAdvice", methods: ['POST'])]    
+    #[OA\Tag(name:'Conseils')]
+
+    /**
+     * postAdvice : création d'un conseil et attribution d'un ou plusieurs mois (manyTomany)
+     *
+     * @return void
+     */
+    public function postAdvice(
         EntityManagerInterface $manager, 
-        UrlGeneratorInterface $urlGenerator,
+        SerializerInterface $serializer, 
+        Request $request, 
         MonthRepository $monthRepository,
-        ): JsonResponse 
+        ValidatorInterface $validator,
+        ): JsonResponse
     {
-
         $advice = $serializer->deserialize($request->getContent(), Advice::class, 'json');
+        
+        //on vérifie les erreurs
+        $errors = $validator->validate($advice);
 
-        // Récupération de l'ensemble des données envoyées sous forme de tableau
+        if($errors->count() > 0){
+            return new JsonResponse($serializer->serialize($errors, 'json'), JsonResponse::HTTP_BAD_REQUEST, [], true);
+        }
+
         $content = $request->toArray();
 
-        // Récupération de l'idMonth. S'il n'est pas défini, alors on met -1 par défaut.
-        $nbMonth = $content['nbMonth'] ?? -1;
+        //On utilise la méthode setContent pour le conseil que l'on souhaite créer
+        $advice->setContent($content['content']);
 
-        // On cherche le mois qui correspond et on l'assigne au conseil.
-        // Si "find" ne trouve pas le mois, alors null sera retourné.
-        $advice->setMonth($monthRepository->findBy($nbMonth));
+        $advice->getMonths()->clear(); // Efface les anciennes relations
 
+        //Les numéros de mois sont saisis dans un tableau, la boucle for each permet d'attribuer les mois au conseil créé
+        foreach ($content['months'] as $number) {
+            //on retrouve l'objet mois qui correspond à sa propriété number
+            $month = $monthRepository->findIdBy(['number' => $number]);
+
+            if (!$month) {
+                // on renvoie une erreur si un mois n'est pas trouvé
+                return new JsonResponse([
+                    'error' => "Le mois avec le numéro {$number} est introuvable, il n'y a que 12 mois dans l'année ;-)."
+                ], JsonResponse::HTTP_NOT_FOUND);
+            }
+
+            $advice->addMonth($month);
+        }
         $manager->persist($advice);
         $manager->flush();
 
-        $jsonAdvice = $serializer->serialize($advice, 'json', ['groups' => 'Advice:Read']);
-        
-        $location = $urlGenerator->generate('detailAdvice', ['id' => $advice->getId()], UrlGeneratorInterface::ABSOLUTE_URL);
+        $jsonAdvice = $serializer->serialize($advice, 'json', ['groups' => 'getAdvices']);
 
-        return new JsonResponse($jsonAdvice, Response::HTTP_CREATED, ["Location" => $location], true);
+        return new JsonResponse($jsonAdvice, JsonResponse::HTTP_CREATED, ['message' => 'Conseil mis à jour avec succès.'], true);
    }
 
-   #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour afficher la liste des utilisateurs')]
-   #[Route('/api/conseils/{id}', name:"updateAdvice", methods:['PUT'])]
+   #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
+   #[Route('/api/conseil/{id}', name:"updateAdvice", methods:['PUT'], requirements:['id' => '\d+'])]  
+   #[OA\Tag(name:'Conseils')]
+
+   /**
+    * updateAdvice : mise à jour du conseil (admin seulement)
+    *
+    * @return void
+    */
    public function updateAdvice(
         Request $request, 
         SerializerInterface $serializer, 
         Advice $currentAdvice, 
         EntityManagerInterface $manager, 
-        MonthRepository $monthRepository
+        MonthRepository $monthRepository,
+        ValidatorInterface $validator
         ): JsonResponse 
    {
        $updatedAdvice = $serializer->deserialize($request->getContent(), 
@@ -95,13 +198,34 @@ class AdviceController extends AbstractController
                'json', 
                [AbstractNormalizer::OBJECT_TO_POPULATE => $currentAdvice]);
 
-       $content = $request->toArray();
-       $nbMonth = $content['nbMonth'] ?? -1;
+        //on vérifie les erreurs
+        $errors = $validator->validate($updatedAdvice);
 
-       $updatedAdvice->setMonth($monthRepository->findBy($nbMonth));
+        if($errors->count() > 0){
+            return new JsonResponse($serializer->serialize($errors, 'json'), JsonResponse::HTTP_BAD_REQUEST, [], true);
+        }
        
+       $content = $request->toArray();
+
+        //on efface les anciennes relations 
+        $updatedAdvice->getMonths()->clear(); // Efface les anciennes relations
+
+       foreach ($content['months'] as $number) {
+           $month = $monthRepository->findIdBy(['number' => $number]);
+
+           if (!$month) {
+            // on renvoie une erreur si un mois n'est pas trouvé
+            return new JsonResponse([
+                'error' => "Le mois avec le numéro {$number} est introuvable, il n'y a que 12 mois dans l'année ;-)."
+            ], JsonResponse::HTTP_NOT_FOUND);
+        }
+
+           $updatedAdvice->addMonth($month);
+       }
+
        $manager->persist($updatedAdvice);
        $manager->flush();
+
        return new JsonResponse(null, JsonResponse::HTTP_NO_CONTENT);
   }
 

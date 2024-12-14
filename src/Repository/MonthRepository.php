@@ -50,6 +50,19 @@ class MonthRepository extends ServiceEntityRepository
         ];
     }
 
+
+       /**
+        * @return ?Month Returns object month
+        */
+        public function findIdBy($value):?Month
+        {
+            return $this->createQueryBuilder('n')
+            ->where('n.number = :number')
+            ->setParameter('number', $value)
+            ->getQuery()
+            ->getOneOrNullResult();
+        }
+
     //    /**
     //     * @return Month[] Returns an array of Month objects
     //     */

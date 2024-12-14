@@ -19,6 +19,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 //         new GetCollection(),
 //     ],
 //     denormalizationContext: ['groups' => ['meteo:write']],
+
 // )]
 
 class Meteo
