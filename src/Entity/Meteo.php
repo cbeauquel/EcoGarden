@@ -7,7 +7,14 @@ use App\Repository\MeteoRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: MeteoRepository::class)]
-#[ApiResource]
+// #[ApiResource(
+//     description: 'Les prévisions météos',
+//     operations: [
+//         new Get(),
+//         new GetCollection(),
+//     ],
+// )]
+
 class Meteo
 {
     #[ORM\Id]
