@@ -1,86 +1,154 @@
-
 <?php
 
-namespace App\Entity;
+namespace App\Controller;
 
-use Doctrine\ORM\Mapping as ORM;
-use App\Repository\AdviceRepository;
-use ApiPlatform\Metadata\ApiResource;
-use Doctrine\Common\Collections\Collection;
-use Doctrine\Common\Collections\ArrayCollection;
-use Symfony\Component\Serializer\Attribute\Groups;
-use Symfony\Component\Validator\Constraints as Assert;
+use App\Entity\User;
+use App\Repository\UserRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\Serializer\SerializerInterface;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-
-#[ORM\Entity(repositoryClass: AdviceRepository::class)]
-// #[ApiResource]
-class Advice
+class UserController extends AbstractController
 {
-    #[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column]
-    #[Groups(["Advice:Read", "Month:Read", "Advice:List"])]
-    private ?int $id = null;
-
-    #[ORM\Column(length: 255)]
-    #[Assert\NotBlank]
-    #[Assert\Length(min:15, minMessage:"Le conseil doit faire au moins 15 caractères")]
-    #[Groups(["Advice:Read", "Month:Read", "Advice:List"])]
-    private ?string $content = null;
-
+    #[Route('/api/users', name: 'user', methods:['GET'])]    
     /**
-     * @var Collection<int, Month>
+     * getUserList Liste paginée des utilisateurs (administrateurs seulement)
+     *
+     * @param  mixed $user
+     * @param  mixed $serializer
+     * @param  mixed $request
+     * @return JsonResponse
      */
-    #[ORM\ManyToMany(targetEntity: Month::class, mappedBy: 'advices')]
-    #[Groups(["Advice:Read"])]
-    private Collection $months;
-
-    public function __construct()
+    public function getUserList(UserRepository $user, SerializerInterface $serializer, Request $request): JsonResponse
     {
-        $this->months = new ArrayCollection();
-    }
-
-    public function getId(): ?int
-    {
-        return $this->id;
-    }
-
-    public function getContent(): ?string
-    {
-        return $this->content;
-    }
-
-    public function setContent(string $content): static
-    {
-        $this->content = $content;
-
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Month>
-     */
-    public function getMonths(): Collection
-    {
-        return $this->months;
-    }
-
-    public function addMonth(Month $month): static
-    {
-        if (!$this->months->contains($month)) {
-            $this->months->add($month);
-            $month->addAdvice($this);
+        $page = $request->get('page', 1);
+        $limit = $request->get('limit', 3);
+        $userList = $user->findAllWithPagination($page, $limit);
+        $canListAll = $this->isGranted('ROLE_ADMIN');
+        if($canListAll){
+            $jsonUserList = $serializer->serialize($userList, 'json', ['groups' => 'User:List']);
+        } else {
+            $jsonUserList = $serializer->serialize($userList, 'json', ['groups' => 'User:Read']);
         }
 
-        return $this;
+        return new JsonResponse(
+            $jsonUserList, Response::HTTP_OK, [], true);
     }
 
-    public function removeMonth(Month $month): static
+    #[Route('/api/user', name: 'User', methods:['GET'])]    
+    /**
+     * getUserDetail : affiche les informations de l'utilisateur connecté
+     *
+     * @param  mixed $serializer
+     * @return JsonResponse
+     */
+    public function getUserDetail(SerializerInterface $serializer): JsonResponse
     {
-        if ($this->months->removeElement($month)) {
-            $month->removeAdvice($this);
-        }
-
-        return $this;
+        $currentUser = $this->getUser();
+        $jsonUserDetail = $serializer->serialize($currentUser, 'json', ['groups' => 'User:Read']);
+        return new JsonResponse(
+            $jsonUserDetail, Response::HTTP_OK, ['accept' => 'json'], true);
     }
+
+    #[Route('/api/user', name: 'deleteMe', methods: ['DELETE'])]    
+    /**
+     * deleteMe : Permet à l'utilisateur de supprimer son compte
+     *
+     * @param  mixed $manager
+     * @return JsonResponse
+     */
+    public function deleteMe(EntityManagerInterface $manager): JsonResponse 
+    {
+        $currentUser = $this->getUser();
+
+        $manager->remove($currentUser);
+        $manager->flush();
+
+        return new JsonResponse(null, Response::HTTP_NO_CONTENT);
+    }
+
+    #[Route('/api/user', name:"createUser", methods: ['POST'])]    
+    /**
+     * createUser : permet à l'utilisateur de créer son compte
+     *
+     * @return void
+     */
+    public function createUser(
+        Request $request, 
+        SerializerInterface $serializer, 
+        EntityManagerInterface $manager, 
+        UrlGeneratorInterface $urlGenerator,
+        UserPasswordHasherInterface $userPasswordHasher,
+        ): JsonResponse 
+    {
+
+        $user = $serializer->deserialize($request->getContent(), User::class, 'json', ['groups' => 'User:Write']);
+        $content = $request->toArray();
+        /** @var string $plainPassword */
+        $plainPassword = $content['password'];
+
+        // encode the plain password
+        $user->setPassword($userPasswordHasher->hashPassword($user, $plainPassword));
+
+        $manager->persist($user);
+        $manager->flush();
+
+        $jsonUser = $serializer->serialize($user, 'json', ['groups' => 'User:Read']);
+        
+        $location = $urlGenerator->generate('user', ['id' => $user->getId()], UrlGeneratorInterface::ABSOLUTE_URL);
+
+        return new JsonResponse($jsonUser, Response::HTTP_CREATED, ["Location" => $location], true);
+   }
+
+   #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les utilisateurs')]
+   #[Route('/api/user/{id}', name: 'deleteUser', methods: ['DELETE'])]   
+   /**
+    * deleteUser : SUpprime le compte de l'utilisateur voulu (admin seulement)
+    *
+    * @param  mixed $user
+    * @param  mixed $manager
+    * @return JsonResponse
+    */
+   public function deleteUser(User $user, EntityManagerInterface $manager): JsonResponse 
+   {
+
+       $manager->remove($user);
+       $manager->flush();
+
+       return new JsonResponse(null, Response::HTTP_NO_CONTENT);
+   }
+
+   #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les utilisateurs')]
+   #[Route('/api/user/{id}', name:"updateUser", methods:['PUT'])]   
+   /**
+    * updateUser Modifie les informations de l'utilisateur (admin seulement)
+    *
+    * @return void
+    */
+   public function updateUser(
+        Request $request, 
+        SerializerInterface $serializer, 
+        User $currentUser, 
+        EntityManagerInterface $manager, 
+        UserPasswordHasherInterface $userPasswordHasher,
+        ): JsonResponse 
+   {
+       $updatedUser = $serializer->deserialize($request->getContent(), 
+               User::class, 
+               'json', 
+               [AbstractNormalizer::OBJECT_TO_POPULATE => $currentUser]);
+       
+       $manager->persist($updatedUser);
+       $manager->flush();
+       return new JsonResponse(null, JsonResponse::HTTP_NO_CONTENT);
+  }
+
 }

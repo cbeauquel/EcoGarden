@@ -8,6 +8,9 @@ use ApiPlatform\Metadata\ApiResource;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Attribute\SerializedName;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
+
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
@@ -21,6 +24,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?int $id = null;
 
     #[ORM\Column(length: 180)]
+    #[Assert\NotBlank]
+    #[Assert\Email()]
     private ?string $email = null;
 
     /**
@@ -32,15 +37,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * @var string The hashed password
      */
-    #[ORM\Column]
+    #[ORM\Column]    
+    #[Assert\NotBlank]
+    #[Assert\PasswordStrength(3)]
     private ?string $password = null;
     #[SerializedName('password')]
     private ?string $plainPassword = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank]
+    #[Assert\Length(min:2, minMessage:"La ville doit faire au moins 3 caractères")]
     private ?string $city = null;
 
     #[ORM\Column(length: 5)]
+    #[Assert\Length(min:5, max:5, minMessage:"Le code postal doit faire 5 caractères")]
     private ?string $postalCode = null;
 
     public function getId(): ?int
