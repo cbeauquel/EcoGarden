@@ -39,7 +39,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     #[ORM\Column]    
     #[Assert\NotBlank]
-    #[Assert\PasswordStrength(3)]
     private ?string $password = null;
     #[SerializedName('password')]
     private ?string $plainPassword = null;
