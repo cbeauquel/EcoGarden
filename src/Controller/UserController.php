@@ -15,6 +15,9 @@ use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Attributes as OA;
+
 
 class UserController extends AbstractController
 {
@@ -27,6 +30,15 @@ class UserController extends AbstractController
      * @param  mixed $request
      * @return JsonResponse
      */
+    #[OA\Response(
+        response:200,
+        description:'Retourne la liste des utilisateurs',
+        content: new OA\JsonContent(
+           type:'array',
+           items: new OA\Items(ref: new Model(type:User::class, groups: ['User:Read']))
+        )
+    )]
+    #[OA\Tag(name:'Users')]
     public function getUserList(UserRepository $user, SerializerInterface $serializer, Request $request): JsonResponse
     {
         $page = $request->get('page', 1);
@@ -43,20 +55,56 @@ class UserController extends AbstractController
             $jsonUserList, Response::HTTP_OK, [], true);
     }
 
-    #[Route('/api/user', name: 'User', methods:['GET'])]    
+    #[Route('/api/user', name: 'UserMe', methods:['GET'])]    
     /**
      * getUserDetail : affiche les informations de l'utilisateur connecté
      *
      * @param  mixed $serializer
      * @return JsonResponse
      */
-    public function getUserDetail(SerializerInterface $serializer): JsonResponse
+    #[OA\Response(
+        response:200,
+        description:'Retourne les infos de l\'utilisateur connecté',
+        content: new OA\JsonContent(
+           type:'array',
+           items: new OA\Items(ref: new Model(type:User::class, groups: ['User:Read']))
+        )
+    )]
+    #[OA\Tag(name:'Users')]
+
+    public function getUserMe(SerializerInterface $serializer): JsonResponse
     {
         $currentUser = $this->getUser();
         $jsonUserDetail = $serializer->serialize($currentUser, 'json', ['groups' => 'User:Read']);
         return new JsonResponse(
             $jsonUserDetail, Response::HTTP_OK, ['accept' => 'json'], true);
     }
+    
+    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les utilisateurs')]
+    #[Route('/api/user/{id}', name: 'User', methods:['GET'], requirements:['id' => '\d+'])]    
+    /**
+     * getUserDetail : affiche les informations de l'utilisateur voulu (admin seulement)
+     *
+     * @param  mixed $serializer
+     * @return JsonResponse
+     */
+    #[OA\Response(
+       response:200,
+       description:'Retourne les infos de l\'utilisateur voulu',
+       content: new OA\JsonContent(
+          type:'array',
+          items: new OA\Items(ref: new Model(type:User::class, groups: ['User:List']))
+       )
+    )]
+    #[OA\Tag(name:'Admin')]
+
+    public function getUserDetail(SerializerInterface $serializer, ?User $user): JsonResponse
+    {
+        $jsonUserDetail = $serializer->serialize($user, 'json', ['groups' => 'User:List']);
+        return new JsonResponse(
+            $jsonUserDetail, Response::HTTP_OK, ['accept' => 'json'], true);
+    }
+
 
     #[Route('/api/user', name: 'deleteMe', methods: ['DELETE'])]    
     /**
@@ -65,6 +113,7 @@ class UserController extends AbstractController
      * @param  mixed $manager
      * @return JsonResponse
      */
+    #[OA\Tag(name:'Users')]
     public function deleteMe(EntityManagerInterface $manager): JsonResponse 
     {
         $currentUser = $this->getUser();
@@ -81,6 +130,8 @@ class UserController extends AbstractController
      *
      * @return void
      */
+    #[OA\Tag(name:'Users')]
+
     public function createUser(
         Request $request, 
         SerializerInterface $serializer, 
@@ -109,7 +160,7 @@ class UserController extends AbstractController
    }
 
    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les utilisateurs')]
-   #[Route('/api/user/{id}', name: 'deleteUser', methods: ['DELETE'])]   
+   #[Route('/api/user/{id}', name: 'deleteUser', methods: ['DELETE'], requirements:['id' => '\d+'])]   
    /**
     * deleteUser : SUpprime le compte de l'utilisateur voulu (admin seulement)
     *
@@ -117,6 +168,8 @@ class UserController extends AbstractController
     * @param  mixed $manager
     * @return JsonResponse
     */
+    #[OA\Tag(name:'Admin')]
+
    public function deleteUser(User $user, EntityManagerInterface $manager): JsonResponse 
    {
 
@@ -127,12 +180,13 @@ class UserController extends AbstractController
    }
 
    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les utilisateurs')]
-   #[Route('/api/user/{id}', name:"updateUser", methods:['PUT'])]   
+   #[Route('/api/user/{id}', name:"updateUser", methods:['PUT'], requirements:['id' => '\d+'])]   
    /**
     * updateUser Modifie les informations de l'utilisateur (admin seulement)
     *
     * @return void
     */
+    #[OA\Tag(name:'Admin')]
    public function updateUser(
         Request $request, 
         SerializerInterface $serializer, 

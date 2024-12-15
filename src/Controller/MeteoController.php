@@ -49,7 +49,8 @@ class MeteoController extends AbstractController
         
         $data = $cachePool->get($cacheKey, function ($cacheItem) use ($httpClient, $city) {
             $cacheItem->expiresAfter(1800); // Expire après 30 minutes
-            $apiUrl = "https://api.openweathermap.org/data/2.5/weather?q={$city}&appid=c959e41603ee00f03a11176562032291&units=metric&lang=fr";
+            $apiKey = $this->getParameter('weather_api_key');
+            $apiUrl = "https://api.openweathermap.org/data/2.5/weather?q={$city}&appid={$apiKey}&units=metric&lang=fr";
 
             $response = $httpClient->request('GET', $apiUrl);
             $data = $response->toArray();

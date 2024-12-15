@@ -102,8 +102,42 @@ class AdviceController extends AbstractController
     }
 
     #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
+    #[Route('/api/conseil-d/{id}', name: 'detailAdvice', methods:['GET'], requirements:['id' => '\d+'])]
+    #[OA\Response(
+        response:200,
+        description:'Retourne la liste des conseils pour l\'identifiant voulu',
+        content: new OA\JsonContent(
+           type:'array',
+           items: new OA\Items(ref: new Model(type:Advice::class, groups: ['Advice:Read']))
+        )
+    )]
+    #[OA\Tag(name:'Admin')]
+    /**
+     * getAdviceByMonth : affiche les conseils d'un mois donné dans la requête
+     *
+     * @param  mixed $monthRepository
+     * @param  mixed $serializer
+     * @param  mixed $nbMonth
+     * @param  mixed $cachePool
+     * @param  mixed $request
+     * @return JsonResponse
+     */
+    public function getAdviceById(
+        MonthRepository $monthRepository, 
+        SerializerInterface $serializer, 
+        ?Advice $advice
+        ): JsonResponse
+    {
+        //récupération de la liste des advices en fonction de l'identifiant saisi
+
+        $jsonAdviceDetail = $serializer->serialize($advice, 'json', ['groups' => 'Advice:Read']);
+
+        return new JsonResponse($jsonAdviceDetail, Response::HTTP_OK, ['accept' => 'json'], true);
+    }
+
+    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
     #[Route('/api/conseil/{id}', name: 'deleteAdvice', methods: ['DELETE'])]    
-    #[OA\Tag(name:'Conseils')]
+    #[OA\Tag(name:'Admin')]
 
     /**
      * deleteAdvice : suppression d'un conseil (admin seuelement)
@@ -122,7 +156,7 @@ class AdviceController extends AbstractController
 
     #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
     #[Route('/api/conseil', name:"createAdvice", methods: ['POST'])]    
-    #[OA\Tag(name:'Conseils')]
+    #[OA\Tag(name:'Admin')]
 
     /**
      * postAdvice : création d'un conseil et attribution d'un ou plusieurs mois (manyTomany)
@@ -177,7 +211,7 @@ class AdviceController extends AbstractController
 
    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
    #[Route('/api/conseil/{id}', name:"updateAdvice", methods:['PUT'], requirements:['id' => '\d+'])]  
-   #[OA\Tag(name:'Conseils')]
+   #[OA\Tag(name:'Admin')]
 
    /**
     * updateAdvice : mise à jour du conseil (admin seulement)

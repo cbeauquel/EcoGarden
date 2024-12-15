@@ -15,23 +15,26 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
-#[ApiResource]
+// #[ApiResource]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(["User:Read", "User:List"])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180)]
     #[Assert\NotBlank]
     #[Assert\Email()]
+    #[Groups(["User:List"])]
     private ?string $email = null;
 
     /**
      * @var list<string> The user roles
      */
     #[ORM\Column]
+    #[Groups(["User:List"])]
     private array $roles = [];
 
     /**
@@ -39,6 +42,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     #[ORM\Column]    
     #[Assert\NotBlank]
+    #[Groups(["User:Write"])]
     private ?string $password = null;
     #[SerializedName('password')]
     private ?string $plainPassword = null;
@@ -46,10 +50,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
     #[Assert\Length(min:2, minMessage:"La ville doit faire au moins 3 caractères")]
+    #[Groups(["User:Read", "User:List"])]
     private ?string $city = null;
 
     #[ORM\Column(length: 5)]
     #[Assert\Length(min:5, max:5, minMessage:"Le code postal doit faire 5 caractères")]
+    #[Groups(["User:Read", "User:List"])]
     private ?string $postalCode = null;
 
     public function getId(): ?int
