@@ -2,39 +2,42 @@
 
 namespace App\Entity;
 
+use OpenApi\Attributes as OA;
 use Doctrine\ORM\Mapping as ORM;
 use App\Repository\UserRepository;
 use ApiPlatform\Metadata\ApiResource;
+use Nelmio\ApiDocBundle\Attribute\Model;
+use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Attribute\SerializedName;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
-use Symfony\Component\Serializer\Attribute\Groups;
-use Symfony\Component\Validator\Constraints as Assert;
 
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+
 // #[ApiResource]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(["User:Read", "User:List"])]
+    #[Groups(["User:Read", "User:List", "User:Write"])]
     private ?int $id = null;
 
-    #[ORM\Column(length: 180)]
+    #[ORM\Column(length: 180, unique: true)]
     #[Assert\NotBlank]
-    #[Assert\Email()]
-    #[Groups(["User:List"])]
+    #[Assert\Email]
+    #[Groups(["User:List", "User:Write"])]
     private ?string $email = null;
 
     /**
      * @var list<string> The user roles
      */
     #[ORM\Column]
-    #[Groups(["User:List"])]
+    #[Groups(["User:List", "User:Write"])]
     private array $roles = [];
 
     /**
@@ -50,12 +53,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
     #[Assert\Length(min:2, minMessage:"La ville doit faire au moins 3 caractères")]
-    #[Groups(["User:Read", "User:List"])]
+    #[Groups(["User:Read", "User:List", "User:Write"])]
     private ?string $city = null;
 
     #[ORM\Column(length: 5)]
     #[Assert\Length(min:5, max:5, minMessage:"Le code postal doit faire 5 caractères")]
-    #[Groups(["User:Read", "User:List"])]
+    #[Groups(["User:Read", "User:List", "User:Write"])]
     private ?string $postalCode = null;
 
     public function getId(): ?int

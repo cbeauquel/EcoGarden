@@ -3,20 +3,21 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use OpenApi\Attributes as OA;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Serializer\SerializerInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
 
 
 class UserController extends AbstractController
@@ -30,6 +31,18 @@ class UserController extends AbstractController
      * @param  mixed $request
      * @return JsonResponse
      */
+    #[OA\Parameter(
+        name:'page',
+        in:'query',
+        description:'La page que l\'on veut récupérer',
+        schema: new OA\Schema(type:'int')
+    )]
+    #[OA\Parameter(
+        name:'limit',
+        in:'query',
+        description:'Le nombre d\'éléments que l\'on veut récupérer',
+        schema: new OA\Schema(type:'int')
+    )]
     #[OA\Response(
         response:200,
         description:'Retourne la liste des utilisateurs',
@@ -75,7 +88,7 @@ class UserController extends AbstractController
     public function getUserMe(SerializerInterface $serializer): JsonResponse
     {
         $currentUser = $this->getUser();
-        $jsonUserDetail = $serializer->serialize($currentUser, 'json', ['groups' => 'User:Read']);
+        $jsonUserDetail = $serializer->serialize($currentUser, 'json', ['groups' => 'User:List']);
         return new JsonResponse(
             $jsonUserDetail, Response::HTTP_OK, ['accept' => 'json'], true);
     }
@@ -130,6 +143,10 @@ class UserController extends AbstractController
      *
      * @return void
      */
+    #[OA\RequestBody(
+        required: true,
+        content:new OA\JsonContent(ref: new Model(type: User::class))
+    )]
     #[OA\Tag(name:'Users')]
 
     public function createUser(
@@ -138,10 +155,18 @@ class UserController extends AbstractController
         EntityManagerInterface $manager, 
         UrlGeneratorInterface $urlGenerator,
         UserPasswordHasherInterface $userPasswordHasher,
+        ValidatorInterface $validator,
         ): JsonResponse 
     {
 
         $user = $serializer->deserialize($request->getContent(), User::class, 'json', ['groups' => 'User:Write']);
+        //on vérifie les erreurs
+        $errors = $validator->validate($user);
+
+        if($errors->count() > 0){
+            return new JsonResponse($serializer->serialize($errors, 'json'), JsonResponse::HTTP_BAD_REQUEST, [], true);
+        }
+        
         $content = $request->toArray();
         /** @var string $plainPassword */
         $plainPassword = $content['password'];
@@ -186,6 +211,10 @@ class UserController extends AbstractController
     *
     * @return void
     */
+    #[OA\RequestBody(
+        required: true,
+        content:new OA\JsonContent(ref: new Model(type: User::class))
+    )]
     #[OA\Tag(name:'Admin')]
    public function updateUser(
         Request $request, 

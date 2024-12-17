@@ -7,6 +7,7 @@ use OpenApi\Attributes as OA;
 use App\Repository\MonthRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
+use Nelmio\ApiDocBundle\Attribute\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -67,7 +68,6 @@ class AdviceController extends AbstractController
         )
     )]
     #[OA\Tag(name:'Conseils')]
-
     /**
      * getAdviceByMonth : affiche les conseils d'un mois donné dans la requête
      *
@@ -82,7 +82,6 @@ class AdviceController extends AbstractController
         MonthRepository $monthRepository, 
         SerializerInterface $serializer, 
         int $nbMonth,
-        ValidatorInterface $validator,
         ): JsonResponse
     {
         //si le numéro de mois saisi n'est pas un mois valide
@@ -138,7 +137,6 @@ class AdviceController extends AbstractController
     #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
     #[Route('/api/conseil/{id}', name: 'deleteAdvice', methods: ['DELETE'])]    
     #[OA\Tag(name:'Admin')]
-
     /**
      * deleteAdvice : suppression d'un conseil (admin seuelement)
      *
@@ -155,9 +153,12 @@ class AdviceController extends AbstractController
     }
 
     #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
-    #[Route('/api/conseil', name:"createAdvice", methods: ['POST'])]    
+    #[Route('/api/conseil', name:"createAdvice", methods: ['POST'])] 
+    #[OA\RequestBody(
+        required: true,
+        content:new OA\JsonContent(ref: new Model(type: Advice::class))
+    )]
     #[OA\Tag(name:'Admin')]
-
     /**
      * postAdvice : création d'un conseil et attribution d'un ou plusieurs mois (manyTomany)
      *
@@ -211,8 +212,11 @@ class AdviceController extends AbstractController
 
    #[IsGranted('ROLE_ADMIN', message:'Vous devez être administrateur pour agir sur les conseils')]
    #[Route('/api/conseil/{id}', name:"updateAdvice", methods:['PUT'], requirements:['id' => '\d+'])]  
+   #[OA\RequestBody(
+    required: true,
+    content:new OA\JsonContent(ref: new Model(type: Advice::class))
+    )]
    #[OA\Tag(name:'Admin')]
-
    /**
     * updateAdvice : mise à jour du conseil (admin seulement)
     *
@@ -240,22 +244,26 @@ class AdviceController extends AbstractController
         }
        
        $content = $request->toArray();
+       
+        //Si la clé "months" est trouvée dans le tableau de la requête, on applique la mise à jour
+       if(isset($content['months']))
+       {
+            //on efface les anciennes relations 
+            $updatedAdvice->getMonths()->clear(); // Efface les anciennes relations
 
-        //on efface les anciennes relations 
-        $updatedAdvice->getMonths()->clear(); // Efface les anciennes relations
+            foreach ($content['months'] as $number) {
+                $month = $monthRepository->findIdBy(['number' => $number]);
 
-       foreach ($content['months'] as $number) {
-           $month = $monthRepository->findIdBy(['number' => $number]);
+                if (!$month) {
+                    // on renvoie une erreur si un mois n'est pas trouvé
+                    return new JsonResponse([
+                        'error' => "Le mois avec le numéro {$number} est introuvable, il n'y a que 12 mois dans l'année ;-)."
+                    ], JsonResponse::HTTP_NOT_FOUND);
+                }
 
-           if (!$month) {
-            // on renvoie une erreur si un mois n'est pas trouvé
-            return new JsonResponse([
-                'error' => "Le mois avec le numéro {$number} est introuvable, il n'y a que 12 mois dans l'année ;-)."
-            ], JsonResponse::HTTP_NOT_FOUND);
+            $updatedAdvice->addMonth($month);
+            }
         }
-
-           $updatedAdvice->addMonth($month);
-       }
 
        $manager->persist($updatedAdvice);
        $manager->flush();

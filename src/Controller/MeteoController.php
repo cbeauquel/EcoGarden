@@ -29,11 +29,11 @@ class MeteoController extends AbstractController
      * getMeteo
      *
      * @param  mixed $httpClient
-     * @param  mixed $city
+     * @param  mixed ?$city
      * @param  mixed $cachePool
      * @return JsonResponse
      */
-    public function getMeteo(HttpClientInterface $httpClient, ?string $city, TagAwareCacheInterface $cachePool): JsonResponse
+    public function getMeteo(HttpClientInterface $httpClient, ?string $city = null, TagAwareCacheInterface $cachePool): JsonResponse
     {
         $user = $this->getUser();
 
@@ -50,7 +50,7 @@ class MeteoController extends AbstractController
         $data = $cachePool->get($cacheKey, function ($cacheItem) use ($httpClient, $city) {
             $cacheItem->expiresAfter(1800); // Expire après 30 minutes
             $apiKey = $this->getParameter('weather_api_key');
-            $apiUrl = "https://api.openweathermap.org/data/2.5/weather?q={$city}&appid={$apiKey}&units=metric&lang=fr";
+            $apiUrl = "https://api.openweathermap.org/data/2.5/weather?q={$city},fr&appid={$apiKey}&units=metric&lang=fr";
 
             $response = $httpClient->request('GET', $apiUrl);
             $data = $response->toArray();

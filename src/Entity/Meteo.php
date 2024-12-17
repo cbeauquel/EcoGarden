@@ -25,9 +25,7 @@ class Meteo
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 255)]
-    #[Assert\NotBlank]
-
+    #[ORM\Column(length: 255, nullable: true)]
     private ?string $city = null;
 
     #[ORM\Column(length: 255)]
