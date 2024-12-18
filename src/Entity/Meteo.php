@@ -2,21 +2,12 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
 use App\Repository\MeteoRepository;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Validator\Constraints as Assert;
-use Symfony\Component\Serializer\Attribute\Groups;
+use OpenApi\Attributes as OA;
 
 
 #[ORM\Entity(repositoryClass: MeteoRepository::class)]
-// #[ApiResource(
-//     description: 'Les prévisions météos',
-//     operations: [
-//         new Get(),
-//         new GetCollection(),
-//     ],
-// )]
 
 class Meteo
 {

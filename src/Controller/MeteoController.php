@@ -15,7 +15,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
 class MeteoController extends AbstractController
 {
-    #[Route('api/meteo/{city?}', name: 'meteo', methods:['GET'])] 
+    #[Route('api/meteo/{city?}', name: 'meteoCity', methods:['GET'])] 
     #[OA\Response(
         response:200,
         description:'Retourne la météo de la ville donnée, si aucune ville saisie, la ville de l\'utilisateur est utilisée',
@@ -33,7 +33,7 @@ class MeteoController extends AbstractController
      * @param  mixed $cachePool
      * @return JsonResponse
      */
-    public function getMeteo(HttpClientInterface $httpClient, ?string $city = null, TagAwareCacheInterface $cachePool): JsonResponse
+    public function getMeteoCity(HttpClientInterface $httpClient, TagAwareCacheInterface $cachePool, ?string $city = null): JsonResponse
     {
         $user = $this->getUser();
 
@@ -42,8 +42,53 @@ class MeteoController extends AbstractController
             return new JsonResponse(['error' => 'Ville non spécifié'], 400);
             }
 
-            $city = $user->getCity();
+            $userCity = $user->getCity();
+        } else {
+            $userCity = $city;
         }
+
+        $cacheKey = sprintf('weather_data_%s', strtolower($userCity));
+        
+        $data = $cachePool->get($cacheKey, function ($cacheItem) use ($httpClient, $userCity) {
+            $cacheItem->expiresAfter(1800); // Expire après 30 minutes
+            $apiKey = $this->getParameter('weather_api_key');
+            $apiUrl = "https://api.openweathermap.org/data/2.5/weather?q={$userCity},fr&appid={$apiKey}&units=metric&lang=fr";
+
+            $response = $httpClient->request('GET', $apiUrl);
+            $data = $response->toArray();
+
+            // Personnaliser la réponse si nécessaire
+            return [
+                'city' => $data['name'],
+                'temperature' => $data['main']['temp'],
+                'ressenti' => $data['main']['feels_like'],
+                'description' => $data['weather'][0]['description'],
+                'vitesse du vent' => $data['wind']['speed'],
+            ];
+        });
+
+        return new JsonResponse($data);
+
+    }
+    #[Route('api/meteo', name: 'meteo', methods:['GET'])] 
+    #[OA\Response(
+        response:200,
+        description:'Retourne la météo de la ville donnée, si aucune ville saisie, la ville de l\'utilisateur est utilisée',
+        content: new OA\JsonContent(
+           type:'array',
+           items: new OA\Items(ref: new Model(type:Meteo::class))
+        )
+    )]
+    #[OA\Tag(name:'Meteo')]   
+    /**
+     * getMeteo
+     *
+     * @param  mixed $httpClient
+     * @param  mixed $cachePool
+     * @return JsonResponse
+     */
+    public function getMeteo(HttpClientInterface $httpClient, TagAwareCacheInterface $cachePool, $city): JsonResponse
+    {
 
         $cacheKey = sprintf('weather_data_%s', strtolower($city));
         
@@ -68,4 +113,5 @@ class MeteoController extends AbstractController
         return new JsonResponse($data);
 
     }
+
 }

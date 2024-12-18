@@ -7,7 +7,6 @@ use OpenApi\Attributes as OA;
 use App\Repository\MonthRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
-use Nelmio\ApiDocBundle\Attribute\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -122,7 +121,6 @@ class AdviceController extends AbstractController
      * @return JsonResponse
      */
     public function getAdviceById(
-        MonthRepository $monthRepository, 
         SerializerInterface $serializer, 
         ?Advice $advice
         ): JsonResponse
